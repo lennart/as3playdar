@@ -121,7 +121,7 @@ package org.playdar{
 	                            function():void{
 	                                retry = retry+1;
 	                                trace('polling');
-	                                poll(qid, retry, onSuccess);
+	                                poll(qid, retry, onSuccess, onError);
 	                            }, 
 	                            polling_interval
 	                        );
@@ -151,7 +151,7 @@ package org.playdar{
             getData(
                 'http://'+host+':'+host_port+'/api/?method=resolve&artist='+artist+'&track='+track, 
                 function(r:Object):void{
-                    poll(r.qid, 0, onSuccess);
+                    poll(r.qid, 0, onSuccess, onError);
                 },
                 function(e:Error):void{
                     onError(e);
