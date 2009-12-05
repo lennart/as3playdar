@@ -20,12 +20,23 @@ package org.playdar{
         public var pauses:Object = {};
         public var state:String = "";
         
+        public var polling_limit:int = 6;
+        public var polling_interval:int = 250;
+        
+        public var host:String = "localhost";
+        public var host_port:int = 60210;
+        
         public var currentSid:String;
         
         [Bindable] public var percentPlayed:Number = 0;
         private var timer:Timer;
-        
-        public function Playdar(){
+           
+        public function Playdar(host:String="localhost",host_port:int=60210,polling_limit:int=6,polling_interval:int=250){
+            this.host = host;
+            this.host_port = host_port;
+            this.polling_interval = polling_interval;
+            this.polling_limit = polling_limit;
+            
             state = "ready";
             timer = new Timer(500);
             timer.addEventListener(TimerEvent.TIMER, function(t:TimerEvent):void{
@@ -64,7 +75,7 @@ package org.playdar{
             currentSid = sid;
             trace('Play called for sid '+sid);
             var snd:Sound = new Sound();
-            snd.load(new URLRequest('http://localhost:60210/sid/'+sid));
+            snd.load(new URLRequest('http://'+host+':'+host_port+'/sid/'+sid));
             channels[sid] = snd.play();
             sounds[sid] = snd;
             state = "playing";
@@ -83,7 +94,7 @@ package org.playdar{
         
         public function status(onSuccess:Function, onError:Function):void{
             getData(
-                'http://localhost:60210/api/?method=stat', 
+                'http://'+host+':'+host_port+'/api/?method=stat', 
                 function(r:Object):void{
                     onSuccess(r);
                 },
@@ -93,29 +104,44 @@ package org.playdar{
             );
         }
         
-        private function poll(qid:String, retry:int, onSuccess:Function):void{
+        private function poll(qid:String, retry:int, onSuccess:Function, onError:Function=null):void{
+        	trace('Poll called for qid '+qid+' with retry count of '+retry);
             getData(
-                'http://localhost:60210/api/?method=get_results&qid='+qid, 
+                'http://'+host+':'+host_port+'/api/?method=get_results&qid='+qid, 
                 function(r:Object):void{
-                    trace('Got poll result');
+                    trace('Got poll result for qid '+qid);
                     if(r.solved){
-                        trace('Solved');
+                        trace('SOLVED qid '+qid);
                         onSuccess(r);
                     }
                     else{
-                        trace('Not Solved');
-                        setTimeout(
-                            function():void{
-                                retry = retry+1;
-                                trace('polling');
-                                poll(qid, retry, onSuccess);
-                            }, 
-                            250
-                        );
+                        trace('Not Solved qid '+qid);
+                        if(retry < polling_limit){
+	                        setTimeout(
+	                            function():void{
+	                                retry = retry+1;
+	                                trace('polling');
+	                                poll(qid, retry, onSuccess);
+	                            }, 
+	                            polling_interval
+	                        );
+                        }
+                        else{
+                        	/**
+                        	 * @todo (lucas) Handle unsolved queries like playdar.js
+                        	 */
+                        	trace('Polling limit exceeded for qid '+qid);
+                        	if(onError!=null){
+		                       var e:Error = new Error('Polling limit exceeded for qid '+qid);
+		                       onError(e);
+		                   }
+                        }
                     }
                 },
                 function(e:Error):void{
-                   
+                   if(onError!=null){
+                       onError(e);
+                   }
                 }
             );
         }
@@ -123,7 +149,7 @@ package org.playdar{
         public function resolve(artist:String, track:String, onSuccess:Function, onError:Function):void{
             trace('Attempting to resolve Artist: '+artist+', Track: '+track);
             getData(
-                'http://localhost:60210/api/?method=resolve&artist='+artist+'&track='+track, 
+                'http://'+host+':'+host_port+'/api/?method=resolve&artist='+artist+'&track='+track, 
                 function(r:Object):void{
                     poll(r.qid, 0, onSuccess);
                 },
