@@ -38,21 +38,22 @@ package org.playdar{
             this.polling_limit = polling_limit;
             
             state = "ready";
-            timer = new Timer(500);
-            timer.addEventListener(TimerEvent.TIMER, function(t:TimerEvent):void{
-                var channel:SoundChannel = SoundChannel(channels[currentSid]);
-                var sound:Sound = Sound(sounds[currentSid]);
-                if(state=="playing"){
-                    percentPlayed = channel.position / sound.length;
-                    if(percentPlayed > .98){
-                        dispatchEvent(new Event("complete"));
-                    }
-                }
-            });
-            timer.start();
+
+        //    timer = new Timer(500);
+        //    timer.addEventListener(TimerEvent.TIMER, function(t:TimerEvent):void{
+        //        var channel:SoundChannel = SoundChannel(channels[currentSid]);
+        //        var sound:Sound = Sound(sounds[currentSid]);
+        //        if(state=="playing"){
+        //            percentPlayed = channel.position / sound.length;
+        //            if(percentPlayed > .98){
+        //                dispatchEvent(new Event("complete"));
+        //            }
+        //        }
+        //    });
+        //    timer.start();
             
         }
-        public function playOrPause(sid:String):void{
+        public function playOrPause(sid:String, onComplete:Function = null, onError: Function = null):void{
             if(state == "paused"){
                 resume(sid);
             }
@@ -60,7 +61,12 @@ package org.playdar{
                 pause(sid);
             }
             else{
-                play(sid);
+              if((onComplete != null) && (onError != null)) {
+                play(sid, onComplete, onError);
+              }
+              else {
+                throw new Error("Cannot play without ending callbacks");
+              }
             }
         }
         
@@ -70,13 +76,15 @@ package org.playdar{
             state = "playing";
         }
         
-        public function play(sid:String):void{
+        public function play(sid:String, onComplete:Function, onError: Function):void{
             SoundMixer.stopAll();
             currentSid = sid;
             trace('Play called for sid '+sid);
             var snd:Sound = new Sound();
+            snd.addEventListener(IOErrorEvent.IO_ERROR, onError);
             snd.load(new URLRequest('http://'+host+':'+host_port+'/sid/'+sid));
             channels[sid] = snd.play();
+            channels[sid].addEventListener(Event.SOUND_COMPLETE, onComplete);
             sounds[sid] = snd;
             state = "playing";
         }
