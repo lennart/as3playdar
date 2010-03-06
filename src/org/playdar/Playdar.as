@@ -1,6 +1,8 @@
 package org.playdar{
     import com.adobe.serialization.json.*;
-    
+    import cc.varga.utils.logger.ILogger;
+    import cc.varga.utils.logger.Logger;
+
     import flash.display.Sprite;
     import flash.events.Event;
     import flash.events.IOErrorEvent;
@@ -15,6 +17,7 @@ package org.playdar{
     import flash.utils.setTimeout;
     
     public class Playdar extends Sprite{
+        private const BUFFER_TIME : Number = 10000;
         public var sounds:Object = {};
         public var channels:Object = {};
         public var pauses:Object = {};
@@ -25,6 +28,7 @@ package org.playdar{
         
         public var host:String = "localhost";
         public var host_port:int = 60210;
+        public var logger: ILogger = new Logger("org.playdar.Playdar");
         
         public var currentSid:String;
         
@@ -36,6 +40,7 @@ package org.playdar{
             this.host_port = host_port;
             this.polling_interval = polling_interval;
             this.polling_limit = polling_limit;
+            SoundMixer.bufferTime = BUFFER_TIME;
             
             state = "ready";
 
@@ -53,6 +58,8 @@ package org.playdar{
         //    timer.start();
             
         }
+
+
         public function playOrPause(sid:String, onComplete:Function = null, onError: Function = null):void{
             if(state == "paused"){
                 resume(sid);
@@ -79,7 +86,7 @@ package org.playdar{
         public function play(sid:String, onComplete:Function, onError: Function):void{
             SoundMixer.stopAll();
             currentSid = sid;
-            trace('Play called for sid '+sid);
+            logger.debug('Play called for sid '+sid);
             var snd:Sound = new Sound();
             snd.addEventListener(IOErrorEvent.IO_ERROR, onError);
             snd.load(new URLRequest('http://'+host+':'+host_port+'/sid/'+sid));
@@ -113,22 +120,22 @@ package org.playdar{
         }
         
         private function poll(qid:String, retry:int, onSuccess:Function, onError:Function=null):void{
-        	trace('Poll called for qid '+qid+' with retry count of '+retry);
+        	logger.debug('Poll called for qid '+qid+' with retry count of '+retry);
             getData(
                 'http://'+host+':'+host_port+'/api/?method=get_results&qid='+qid, 
                 function(r:Object):void{
-                    trace('Got poll result for qid '+qid);
+                    logger.debug('Got poll result for qid '+qid);
                     if(r.solved){
-                        trace('SOLVED qid '+qid);
+                        logger.debug('SOLVED qid '+qid);
                         onSuccess(r);
                     }
                     else{
-                        trace('Not Solved qid '+qid);
+                        logger.debug('Not Solved qid '+qid);
                         if(retry < polling_limit){
 	                        setTimeout(
 	                            function():void{
 	                                retry = retry+1;
-	                                trace('polling');
+	                                logger.debug('polling');
 	                                poll(qid, retry, onSuccess, onError);
 	                            }, 
 	                            polling_interval
@@ -138,7 +145,7 @@ package org.playdar{
                         	/**
                         	 * @todo (lucas) Handle unsolved queries like playdar.js
                         	 */
-                        	trace('Polling limit exceeded for qid '+qid);
+                        	logger.debug('Polling limit exceeded for qid '+qid);
                         	if(onError!=null){
 		                       var e:Error = new Error('Polling limit exceeded for qid '+qid);
 		                       onError(e);
@@ -155,7 +162,7 @@ package org.playdar{
         }
         
         public function resolve(artist:String, track:String, onSuccess:Function, onError:Function):void{
-            trace('Attempting to resolve Artist: '+artist+', Track: '+track);
+            logger.debug('Attempting to resolve Artist: '+artist+', Track: '+track);
             getData(
                 'http://'+host+':'+host_port+'/api/?method=resolve&artist='+artist+'&track='+track, 
                 function(r:Object):void{
